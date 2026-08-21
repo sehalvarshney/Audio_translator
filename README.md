@@ -47,7 +47,7 @@ Models were specifically chosen to run on modest consumer GPUs (developed and te
 
 ```
 .
-├── main.py         # FastAPI backend (STT → Translate → TTS pipeline)
+├── main1.py         # FastAPI backend (STT → Translate → TTS pipeline)
 ├── index.html      # Frontend UI
 ├── requirements.txt
 └── README.md
