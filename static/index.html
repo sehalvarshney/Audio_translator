@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audio Translator</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222c;
+    --accent: #6c8bff;
+    --accent-2: #4ade80;
+    --text: #e7e9ee;
+    --text-dim: #9aa1b0;
+    --error: #ff6b6b;
+    --border: #2a2f3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header { margin-bottom: 24px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  header p { color: var(--text-dim); margin: 0; font-size: 14px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+  label { font-size: 13px; color: var(--text-dim); display: block; margin-bottom: 6px; }
+
+  select, input[type="file"] {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  select { min-width: 200px; }
+
+  #dropzone {
+    flex: 1;
+    min-width: 240px;
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  #dropzone.drag { border-color: var(--accent); color: var(--text); }
+  #dropzone.has-file { border-color: var(--accent-2); color: var(--text); }
+
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .rec-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .rec-btn.recording { background: var(--error); color: white; border-color: var(--error); }
+
+  .status-box {
+    display: none;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap;
+  }
+
+  .step-list { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .step {
+    flex: 1; min-width: 140px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .step.active .dot { background: var(--accent); animation: pulse 1s infinite; }
+  .step.done .dot { background: var(--accent-2); animation: none; }
+  .step.done { color: var(--text); }
+  .step.error .dot { background: var(--error); animation: none; }
+  .step.error { color: var(--error); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .error-box {
+    display: none;
+    background: rgba(255,107,107,0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+
+  .results { display: none; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .result-grid { grid-template-columns: 1fr; } }
+
+  .sub-panel h3 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-dim); margin: 0 0 10px;
+  }
+  .sub-text {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .sub-actions { margin-top: 10px; display: flex; gap: 8px; }
+
+  audio { width: 100%; margin-top: 6px; }
+
+  .meta-line { font-size: 12px; color: var(--text-dim); margin-top: 10px; }
+  .badge {
+    display: inline-block;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎙️ Audio Translator</h1>
+    <p>Speech-to-text → translation → text-to-speech, with subtitles for both languages.</p>
+  </header>
+
+  <div class="panel">
+    <div class="row" style="margin-bottom:14px;">
+      <div>
+        <label for="apiBase">API Base URL</label>
+        <input id="apiBase" type="text" value="http://localhost:8000" style="width:220px; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-size:14px;" />
+      </div>
+      <div>
+        <label for="targetLang">Target language</label>
+        <select id="targetLang"><option>Loading...</option></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div id="dropzone">
+        📁 Click to choose an audio file, or drag &amp; drop it here<br/>
+        <span id="fileNameLabel" style="font-size:12px;"></span>
+      </div>
+      <input id="fileInput" type="file" accept="audio/*" style="display:none;" />
+      <button id="recBtn" class="rec-btn" type="button">🔴 Record</button>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <button id="submitBtn" disabled>Translate Audio</button>
+      <button id="resetBtn" class="secondary" type="button" style="display:none;">Start over</button>
+    </div>
+
+    <div class="step-list" id="stepList" style="display:none;">
+      <div class="step" id="step1"><div class="dot"></div>Speech → Text</div>
+      <div class="step" id="step2"><div class="dot"></div>Translating</div>
+      <div class="step" id="step3"><div class="dot"></div>Text → Speech</div>
+    </div>
+
+    <div class="status-box" id="statusBox"></div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div class="panel results" id="results">
+    <div class="meta-line" id="metaLine"></div>
+    <div class="result-grid" style="margin-top:14px;">
+      <div class="sub-panel">
+        <h3>Original subtitles</h3>
+        <div class="sub-text" id="originalText">—</div>
+        <div class="sub-actions">
+          <button class="secondary" id="dlOriginalSrt">Download .srt</button>
+        </div>
+      </div>
+      <div class="sub-panel">
+        <h3>Translated subtitles</h3>
+        <div class="sub-text" id="translatedText">—</div>
+        <div class="sub-actions">
+          <button class="secondary" id="dlTranslatedSrt">Download .srt</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-dim); margin:0 0 8px;">Translated audio</h3>
+      <audio id="resultAudio" controls></audio>
+      <div class="sub-actions">
+        <button class="secondary" id="dlAudio">Download .wav</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let selectedFile = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let lastResult = null;
+
+function apiBase() {
+  return $("apiBase").value.replace(/\/+$/, "");
+}
+
+function logStatus(msg) {
+  const box = $("statusBox");
+  box.style.display = "block";
+  const time = new Date().toLocaleTimeString();
+  box.textContent += `[${time}] ${msg}\n`;
+  box.scrollTop = box.scrollHeight;
+  console.log(`[audio-translator] ${msg}`);
+}
+
+function showError(msg) {
+  const box = $("errorBox");
+  box.style.display = "block";
+  box.textContent = "⚠️ " + msg;
+  logStatus("ERROR: " + msg);
+}
+
+function clearError() {
+  $("errorBox").style.display = "none";
+  $("errorBox").textContent = "";
+}
+
+function setStep(stepId, state) {
+  const el = $(stepId);
+  el.classList.remove("active", "done", "error");
+  if (state) el.classList.add(state);
+}
+
+function resetSteps() {
+  ["step1", "step2", "step3"].forEach((id) => setStep(id, null));
+}
+
+// ---------- Load supported languages ----------
+async function loadLanguages() {
+  const select = $("targetLang");
+  try {
+    logStatus(`Fetching languages from ${apiBase()}/api/languages ...`);
+    const res = await fetch(`${apiBase()}/api/languages`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    select.innerHTML = "";
+    Object.entries(data).forEach(([code, name]) => {
+      const opt = document.createElement("option");
+      opt.value = code;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+    logStatus(`Loaded ${Object.keys(data).length} languages`);
+  } catch (err) {
+    select.innerHTML = '<option value="">(failed to load)</option>';
+    showError(`Could not reach backend at ${apiBase()}. Is main.py running? (${err.message})`);
+  }
+}
+loadLanguages();
+
+// ---------- File selection ----------
+const dropzone = $("dropzone");
+const fileInput = $("fileInput");
+
+dropzone.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("drag"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("drag");
+  if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", (e) => {
+  if (e.target.files.length) setFile(e.target.files[0]);
+});
+
+function setFile(file) {
+  selectedFile = file;
+  dropzone.classList.add("has-file");
+  $("fileNameLabel").textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  $("submitBtn").disabled = false;
+  logStatus(`File selected: ${file.name}`);
+}
+
+// ---------- Mic recording ----------
+$("recBtn").addEventListener("click", async () => {
+  const btn = $("recBtn");
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    btn.classList.remove("recording");
+    btn.textContent = "🔴 Record";
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: "audio/webm" });
+      const file = new File([blob], `recording-${Date.now()}.webm`, { type: "audio/webm" });
+      setFile(file);
+      stream.getTracks().forEach((t) => t.stop());
+    };
+    mediaRecorder.start();
+    btn.classList.add("recording");
+    btn.textContent = "⏹ Stop";
+    logStatus("Recording started...");
+  } catch (err) {
+    showError("Microphone access denied or unavailable: " + err.message);
+  }
+});
+
+// ---------- Submit ----------
+$("submitBtn").addEventListener("click", async () => {
+  if (!selectedFile) return;
+  clearError();
+  $("results").style.display = "none";
+  $("statusBox").textContent = "";
+  $("stepList").style.display = "flex";
+  resetSteps();
+  $("submitBtn").disabled = true;
+  $("resetBtn").style.display = "none";
+
+  const targetLang = $("targetLang").value;
+  logStatus(`Starting pipeline: target_lang=${targetLang}, file=${selectedFile.name}`);
+
+  setStep("step1", "active");
+
+  const formData = new FormData();
+  formData.append("audio", selectedFile);
+  formData.append("target_lang", targetLang);
+
+  try {
+    const res = await fetch(`${apiBase()}/api/process`, {
+      method: "POST",
+      body: formData,
+    });
+
+    // Since the backend runs all 3 steps before responding, we mark them
+    // done together once the response arrives (no streaming in this simple version).
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        detail = errJson.detail || detail;
+      } catch (_) {}
+      setStep("step1", "error");
+      throw new Error(detail);
+    }
+
+    const data = await res.json();
+    lastResult = data;
+
+    setStep("step1", "done");
+    setStep("step2", "done");
+    setStep("step3", "done");
+    logStatus(`Pipeline complete. request_id=${data.request_id}`);
+
+    renderResults(data);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    $("submitBtn").disabled = false;
+    $("resetBtn").style.display = "inline-block";
+  }
+});
+
+function renderResults(data) {
+  $("results").style.display = "block";
+  $("metaLine").innerHTML =
+    `<span class="badge">Detected: ${data.detected_source_language}</span>` +
+    `<span class="badge">Target: ${data.target_language}</span>` +
+    `<span class="badge">Request: ${data.request_id}</span>`;
+
+  $("originalText").textContent = data.original_text || "(no speech detected)";
+  $("translatedText").textContent = data.translated_text || "(no translation)";
+
+  const audioEl = $("resultAudio");
+  const audioSrc = `data:audio/wav;base64,${data.audio_base64}`;
+  audioEl.src = audioSrc;
+
+  $("dlOriginalSrt").onclick = () => downloadText(data.original_srt, "original.srt");
+  $("dlTranslatedSrt").onclick = () => downloadText(data.translated_srt, "translated.srt");
+  $("dlAudio").onclick = () => downloadBase64Audio(data.audio_base64, "translated_audio.wav");
+}
+
+function downloadText(text, filename) {
+  const blob = new Blob([text], { type: "text/plain" });
+  triggerDownload(URL.createObjectURL(blob), filename);
+}
+
+function downloadBase64Audio(b64, filename) {
+  triggerDownload(`data:audio/wav;base64,${b64}`, filename);
+}
+
+function triggerDownload(href, filename) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ---------- Reset ----------
+$("resetBtn").addEventListener("click", () => {
+  selectedFile = null;
+  lastResult = null;
+  fileInput.value = "";
+  dropzone.classList.remove("has-file");
+  $("fileNameLabel").textContent = "";
+  $("submitBtn").disabled = true;
+  $("results").style.display = "none";
+  $("stepList").style.display = "none";
+  $("statusBox").textContent = "";
+  $("statusBox").style.display = "none";
+  clearError();
+  $("resetBtn").style.display = "none";
+});
+</script>
+</body>
+</html>
